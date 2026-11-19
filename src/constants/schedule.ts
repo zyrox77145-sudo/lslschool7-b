@@ -71,7 +71,65 @@ export function createInitialWeeklySchedule(): WeeklySchedule {
   };
 }
 
+export const MAX_TIME_LENGTH = 40;
+export const MAX_SUBJECT_LENGTH = 120;
+
 export const SCHEDULE_STORAGE_KEY = 'lsl_school_7b_schedule_v1';
+
+export function sanitizeScheduleForFirestore(schedule: WeeklySchedule): WeeklySchedule {
+  const sanitized = createInitialWeeklySchedule();
+  for (const day of DAYS_OF_WEEK) {
+    const entries = Array.isArray(schedule[day]) ? schedule[day] : [];
+    sanitized[day] = DEFAULT_PERIOD_TIMES.map((defaultTime, idx) => {
+      const entry = entries[idx];
+      const rawTime =
+        typeof entry?.time === 'string' && entry.time.trim().length > 0
+          ? entry.time.trim().slice(0, MAX_TIME_LENGTH)
+          : defaultTime;
+      const rawSubject =
+        typeof entry?.subject === 'string'
+          ? entry.subject.trim().slice(0, MAX_SUBJECT_LENGTH)
+          : '';
+      return {
+        period: idx + 1,
+        time: rawTime,
+        subject: rawSubject,
+      };
+    });
+  }
+  return sanitized;
+}
+
+export function parseFirestoreSchedule(
+  data: Record<string, unknown> | undefined,
+): WeeklySchedule | null {
+  if (!data || typeof data !== 'object') return null;
+  const fallback = createInitialWeeklySchedule();
+  let hasAnyDay = false;
+  for (const day of DAYS_OF_WEEK) {
+    const dayEntries = data[day];
+    if (Array.isArray(dayEntries) && dayEntries.length === 8) {
+      hasAnyDay = true;
+      fallback[day] = dayEntries.map((rawEntry, idx) => {
+        const entry = rawEntry as Partial<PeriodEntry> | undefined;
+        const rawTime =
+          typeof entry?.time === 'string' && entry.time.trim().length > 0
+            ? entry.time.trim().slice(0, MAX_TIME_LENGTH)
+            : DEFAULT_PERIOD_TIMES[idx];
+        const rawSubject =
+          typeof entry?.subject === 'string'
+            ? entry.subject.slice(0, MAX_SUBJECT_LENGTH)
+            : '';
+        return {
+          period: idx + 1,
+          time: rawTime,
+          subject: rawSubject,
+        };
+      });
+    }
+  }
+  return hasAnyDay ? fallback : null;
+}
 
 export function loadSavedSchedule(): WeeklySchedule {
   const fallback = createInitialWeeklySchedule();
@@ -86,7 +144,7 @@ export function loadSavedSchedule(): WeeklySchedule {
         hydrated[day] = dayEntries.map((entry, idx) => {
           const rawTime =
             typeof entry?.time === 'string' && entry.time.trim().length > 0
-              ? entry.time.trim()
+              ? entry.time.trim().slice(0, MAX_TIME_LENGTH)
               : DEFAULT_PERIOD_TIMES[idx];
           // Upgrade untouched legacy default times so all days match the unified bell schedule
           const normalizedTime =
@@ -96,7 +154,10 @@ export function loadSavedSchedule(): WeeklySchedule {
           return {
             period: idx + 1,
             time: normalizedTime,
-            subject: typeof entry?.subject === 'string' ? entry.subject : '',
+            subject:
+              typeof entry?.subject === 'string'
+                ? entry.subject.slice(0, MAX_SUBJECT_LENGTH)
+                : '',
           };
         });
       }

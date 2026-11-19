@@ -17,8 +17,8 @@ export interface NeonSculptureRig {
   ringInnerMat: THREE.MeshStandardMaterial;
   primaryHaloMat: THREE.SpriteMaterial;
   secondaryHaloMat: THREE.SpriteMaterial;
-  outerRing: THREE.Mesh;
-  innerRing: THREE.Mesh;
+  outerRing: THREE.Object3D;
+  innerRing: THREE.Object3D;
   letterGroups: THREE.Group[];
   clickableMeshes: THREE.Object3D[];
   dissolveSamples: DissolveSample[];
@@ -26,276 +26,103 @@ export interface NeonSculptureRig {
   dispose: () => void;
 }
 
-interface GlyphStroke {
-  curve: THREE.Curve<THREE.Vector3>;
-  closed: boolean;
-  segments: number;
-}
+const UPPER_BITMAPS: Record<string, string[]> = {
+  L: [
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '10000',
+    '11111',
+  ],
+  S: [
+    '01111',
+    '10000',
+    '10000',
+    '01110',
+    '00001',
+    '00001',
+    '11110',
+  ],
+};
 
-interface GlyphSpec {
-  width: number;
-  strokes: GlyphStroke[];
-}
+const LOWER_BITMAPS: Record<string, string[]> = {
+  S: [
+    '01111',
+    '10000',
+    '10000',
+    '01110',
+    '00001',
+    '00001',
+    '11110',
+  ],
+  c: [
+    '00000',
+    '00000',
+    '01110',
+    '10001',
+    '10000',
+    '10001',
+    '01110',
+  ],
+  h: [
+    '10000',
+    '10000',
+    '11110',
+    '10001',
+    '10001',
+    '10001',
+    '10001',
+  ],
+  o: [
+    '00000',
+    '00000',
+    '01110',
+    '10001',
+    '10001',
+    '10001',
+    '01110',
+  ],
+  l: [
+    '110',
+    '010',
+    '010',
+    '010',
+    '010',
+    '010',
+    '111',
+  ],
+};
 
-function createRoundedPolylinePath(
-  points: THREE.Vector2[],
-  cornerRadius: number,
-  z = 0,
-): THREE.CurvePath<THREE.Vector3> {
-  const path = new THREE.CurvePath<THREE.Vector3>();
-  if (points.length < 2) return path;
-
-  let prevEnd = new THREE.Vector3(points[0].x, points[0].y, z);
-
-  for (let i = 1; i < points.length - 1; i++) {
-    const pPrev = points[i - 1];
-    const pCurr = points[i];
-    const pNext = points[i + 1];
-
-    const vIn = new THREE.Vector2().subVectors(pCurr, pPrev);
-    const vOut = new THREE.Vector2().subVectors(pNext, pCurr);
-    const lenIn = vIn.length();
-    const lenOut = vOut.length();
-    const r = Math.min(cornerRadius, lenIn * 0.42, lenOut * 0.42);
-
-    vIn.normalize();
-    vOut.normalize();
-
-    const cornerStart = new THREE.Vector3(
-      pCurr.x - vIn.x * r,
-      pCurr.y - vIn.y * r,
-      z,
-    );
-    const cornerMid = new THREE.Vector3(pCurr.x, pCurr.y, z);
-    const cornerEnd = new THREE.Vector3(
-      pCurr.x + vOut.x * r,
-      pCurr.y + vOut.y * r,
-      z,
-    );
-
-    if (prevEnd.distanceTo(cornerStart) > 0.001) {
-      path.add(new THREE.LineCurve3(prevEnd, cornerStart));
-    }
-    path.add(new THREE.QuadraticBezierCurve3(cornerStart, cornerMid, cornerEnd));
-    prevEnd = cornerEnd;
-  }
-
-  const last = new THREE.Vector3(
-    points[points.length - 1].x,
-    points[points.length - 1].y,
-    z,
-  );
-  if (prevEnd.distanceTo(last) > 0.001) {
-    path.add(new THREE.LineCurve3(prevEnd, last));
-  }
-
-  return path;
-}
-
-function createSmoothSpline(
-  coords: Array<[number, number]>,
-  closed = false,
-  z = 0,
-): THREE.CatmullRomCurve3 {
-  const pts = coords.map(([x, y]) => new THREE.Vector3(x, y, z));
-  return new THREE.CatmullRomCurve3(pts, closed, 'centripetal', 0.5);
-}
-
-function createCapsuleLoopCurve(
-  width: number,
-  height: number,
-  radius: number,
-  z = 0,
-): THREE.CurvePath<THREE.Vector3> {
-  const hw = width / 2;
-  const hh = height / 2;
-  const r = Math.min(radius, hw * 0.9, hh * 0.9);
-  const path = new THREE.CurvePath<THREE.Vector3>();
-
-  const p0 = new THREE.Vector3(-hw + r, hh, z);
-  const p1 = new THREE.Vector3(hw - r, hh, z);
-  const p2 = new THREE.Vector3(hw, hh - r, z);
-  const p3 = new THREE.Vector3(hw, -hh + r, z);
-  const p4 = new THREE.Vector3(hw - r, -hh, z);
-  const p5 = new THREE.Vector3(-hw + r, -hh, z);
-  const p6 = new THREE.Vector3(-hw, -hh + r, z);
-  const p7 = new THREE.Vector3(-hw, hh - r, z);
-
-  path.add(new THREE.LineCurve3(p0, p1));
-  path.add(new THREE.QuadraticBezierCurve3(p1, new THREE.Vector3(hw, hh, z), p2));
-  path.add(new THREE.LineCurve3(p2, p3));
-  path.add(new THREE.QuadraticBezierCurve3(p3, new THREE.Vector3(hw, -hh, z), p4));
-  path.add(new THREE.LineCurve3(p4, p5));
-  path.add(new THREE.QuadraticBezierCurve3(p5, new THREE.Vector3(-hw, -hh, z), p6));
-  path.add(new THREE.LineCurve3(p6, p7));
-  path.add(new THREE.QuadraticBezierCurve3(p7, new THREE.Vector3(-hw, hh, z), p0));
-
-  return path;
-}
-
-function getUpperGlyphSpec(char: string, scaleX: number, scaleY: number): GlyphSpec {
-  if (char === 'L') {
-    const pts = [
-      new THREE.Vector2(0.14 * scaleX, 1.0 * scaleY),
-      new THREE.Vector2(0.14 * scaleX, 0.0 * scaleY),
-      new THREE.Vector2(0.88 * scaleX, 0.0 * scaleY),
-    ];
-    return {
-      width: 0.96 * scaleX,
-      strokes: [
-        {
-          curve: createRoundedPolylinePath(pts, 0.14 * scaleX, 0),
-          closed: false,
-          segments: 44,
-        },
-      ],
-    };
-  }
-
-  // Uppercase 'S'
-  const sPts: Array<[number, number]> = [
-    [0.86 * scaleX, 0.83 * scaleY],
-    [0.68 * scaleX, 0.98 * scaleY],
-    [0.34 * scaleX, 0.98 * scaleY],
-    [0.14 * scaleX, 0.80 * scaleY],
-    [0.20 * scaleX, 0.58 * scaleY],
-    [0.50 * scaleX, 0.50 * scaleY],
-    [0.82 * scaleX, 0.40 * scaleY],
-    [0.88 * scaleX, 0.19 * scaleY],
-    [0.68 * scaleX, 0.01 * scaleY],
-    [0.32 * scaleX, 0.01 * scaleY],
-    [0.12 * scaleX, 0.16 * scaleY],
-  ];
-
-  return {
-    width: 1.0 * scaleX,
-    strokes: [
-      {
-        curve: createSmoothSpline(sPts, false, 0),
-        closed: false,
-        segments: 72,
-      },
-    ],
-  };
-}
-
-function getLowerGlyphSpec(char: string, scale: number): GlyphSpec {
-  const s = scale;
-  switch (char) {
-    case 'S': {
-      const pts: Array<[number, number]> = [
-        [0.78 * s, 0.84 * s],
-        [0.60 * s, 0.98 * s],
-        [0.32 * s, 0.98 * s],
-        [0.14 * s, 0.80 * s],
-        [0.20 * s, 0.58 * s],
-        [0.46 * s, 0.50 * s],
-        [0.74 * s, 0.39 * s],
-        [0.80 * s, 0.18 * s],
-        [0.60 * s, 0.01 * s],
-        [0.28 * s, 0.01 * s],
-        [0.10 * s, 0.16 * s],
-      ];
-      return {
-        width: 0.90 * s,
-        strokes: [{ curve: createSmoothSpline(pts, false, 0), closed: false, segments: 64 }],
-      };
-    }
-    case 'c': {
-      const pts: Array<[number, number]> = [
-        [0.64 * s, 0.56 * s],
-        [0.46 * s, 0.70 * s],
-        [0.20 * s, 0.64 * s],
-        [0.10 * s, 0.35 * s],
-        [0.20 * s, 0.06 * s],
-        [0.46 * s, 0.00 * s],
-        [0.64 * s, 0.14 * s],
-      ];
-      return {
-        width: 0.74 * s,
-        strokes: [{ curve: createSmoothSpline(pts, false, 0), closed: false, segments: 48 }],
-      };
-    }
-    case 'h': {
-      const stem = createRoundedPolylinePath(
-        [new THREE.Vector2(0.14 * s, 1.0 * s), new THREE.Vector2(0.14 * s, 0.0 * s)],
-        0.05 * s,
-        0,
-      );
-      const archPts: Array<[number, number]> = [
-        [0.14 * s, 0.38 * s],
-        [0.26 * s, 0.63 * s],
-        [0.48 * s, 0.70 * s],
-        [0.66 * s, 0.55 * s],
-        [0.70 * s, 0.30 * s],
-        [0.70 * s, 0.00 * s],
-      ];
-      return {
-        width: 0.82 * s,
-        strokes: [
-          { curve: stem, closed: false, segments: 20 },
-          { curve: createSmoothSpline(archPts, false, 0), closed: false, segments: 48 },
-        ],
-      };
-    }
-    case 'o': {
-      const cx = 0.38 * s;
-      const cy = 0.35 * s;
-      const rx = 0.29 * s;
-      const ry = 0.35 * s;
-      const pts: Array<[number, number]> = [];
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
-      }
-      return {
-        width: 0.76 * s,
-        strokes: [{ curve: createSmoothSpline(pts, true, 0), closed: true, segments: 56 }],
-      };
-    }
-    case 'l':
-    default: {
-      const stem = createRoundedPolylinePath(
-        [
-          new THREE.Vector2(0.18 * s, 1.0 * s),
-          new THREE.Vector2(0.18 * s, 0.04 * s),
-          new THREE.Vector2(0.36 * s, 0.0 * s),
-        ],
-        0.10 * s,
-        0,
-      );
-      return {
-        width: 0.44 * s,
-        strokes: [{ curve: stem, closed: false, segments: 32 }],
-      };
-    }
-  }
-}
-
-function createSoftHaloTexture(): THREE.CanvasTexture {
-  const size = 256;
+function createPixelHaloTexture(): THREE.CanvasTexture {
+  const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const grad = ctx.createRadialGradient(
-      size / 2,
-      size / 2,
-      0,
-      size / 2,
-      size / 2,
-      size / 2,
-    );
-    grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.72)');
-    grad.addColorStop(0.28, 'rgba(255, 255, 255, 0.32)');
-    grad.addColorStop(0.62, 'rgba(255, 255, 255, 0.08)');
-    grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
+    // Stepped concentric pixel glow squares (authentic 8-bit pixel halo)
+    const steps = 16;
+    const cell = size / steps;
+    for (let y = 0; y < steps; y++) {
+      for (let x = 0; x < steps; x++) {
+        const dx = Math.abs(x + 0.5 - steps / 2) / (steps / 2);
+        const dy = Math.abs(y + 0.5 - steps / 2) / (steps / 2);
+        const dist = Math.max(dx, dy) * 0.72 + Math.hypot(dx, dy) * 0.28;
+        const alpha = Math.max(0, 1 - dist);
+        const steppedAlpha = Math.floor(alpha * 6) / 6;
+        if (steppedAlpha > 0) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${(steppedAlpha * 0.55).toFixed(3)})`;
+          ctx.fillRect(x * cell, y * cell, cell, cell);
+        }
+      }
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
   texture.needsUpdate = true;
   return texture;
 }
@@ -311,14 +138,14 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
   const signGroup = new THREE.Group();
   root.add(signGroup);
 
-  // Materials
+  // --- Pixel-Art / Voxel Neon Materials ---
   const primaryCoreMat = track(
     new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#ffffff'),
+      color: new THREE.Color('#ecfeff'),
       emissive: new THREE.Color('#22D3EE'),
-      emissiveIntensity: 2.6,
-      roughness: 0.15,
-      metalness: 0.05,
+      emissiveIntensity: 2.25,
+      roughness: 0.22,
+      metalness: 0.08,
       transparent: true,
       opacity: 1,
     }),
@@ -328,21 +155,21 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color('#22D3EE'),
       emissive: new THREE.Color('#22D3EE'),
-      emissiveIntensity: 1.5,
-      roughness: 0.12,
-      metalness: 0.1,
+      emissiveIntensity: 1.35,
+      roughness: 0.16,
+      metalness: 0.14,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.48,
     }),
   );
 
   const secondaryCoreMat = track(
     new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#ffffff'),
+      color: new THREE.Color('#fdf2f8'),
       emissive: new THREE.Color('#EC4899'),
-      emissiveIntensity: 2.5,
-      roughness: 0.15,
-      metalness: 0.05,
+      emissiveIntensity: 2.2,
+      roughness: 0.22,
+      metalness: 0.08,
       transparent: true,
       opacity: 1,
     }),
@@ -352,11 +179,11 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color('#EC4899'),
       emissive: new THREE.Color('#EC4899'),
-      emissiveIntensity: 1.45,
-      roughness: 0.12,
-      metalness: 0.1,
+      emissiveIntensity: 1.3,
+      roughness: 0.16,
+      metalness: 0.14,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.48,
     }),
   );
 
@@ -364,9 +191,9 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color('#38BDF8'),
       emissive: new THREE.Color('#22D3EE'),
-      emissiveIntensity: 1.35,
-      roughness: 0.18,
-      metalness: 0.2,
+      emissiveIntensity: 1.25,
+      roughness: 0.24,
+      metalness: 0.25,
       transparent: true,
       opacity: 1,
     }),
@@ -376,7 +203,7 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color('#22D3EE'),
       emissive: new THREE.Color('#22D3EE'),
-      emissiveIntensity: 1.2,
+      emissiveIntensity: 1.25,
       roughness: 0.2,
       metalness: 0.3,
       transparent: true,
@@ -388,7 +215,7 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     new THREE.MeshStandardMaterial({
       color: new THREE.Color('#EC4899'),
       emissive: new THREE.Color('#EC4899'),
-      emissiveIntensity: 1.2,
+      emissiveIntensity: 1.25,
       roughness: 0.2,
       metalness: 0.3,
       transparent: true,
@@ -396,232 +223,210 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     }),
   );
 
-  // Dark anodized brushed titanium for frame housing & standoffs (contrasting roughness/metalness)
   const titaniumMat = track(
     new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#1a2234'),
-      roughness: 0.28,
-      metalness: 0.88,
+      color: new THREE.Color('#131b2e'),
+      roughness: 0.35,
+      metalness: 0.85,
       transparent: true,
       opacity: 1,
     }),
   );
-
-  // Matte silicone electrode collars at neon tube terminations
-  const siliconeCapMat = track(
-    new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#0c0f17'),
-      roughness: 0.88,
-      metalness: 0.06,
-      transparent: true,
-      opacity: 1,
-    }),
-  );
-
-  const capGeo = track(new THREE.CylinderGeometry(0.052, 0.058, 0.11, 12));
-  const smallCapGeo = track(new THREE.CylinderGeometry(0.036, 0.042, 0.08, 12));
-  const standoffGeo = track(new THREE.CylinderGeometry(0.024, 0.024, 0.32, 10));
-  const tipSphereGeo = track(new THREE.SphereGeometry(0.046, 12, 12));
-  const smallTipSphereGeo = track(new THREE.SphereGeometry(0.032, 12, 12));
 
   const letterGroups: THREE.Group[] = [];
   const clickableMeshes: THREE.Object3D[] = [];
   const dissolveSamples: DissolveSample[] = [];
 
-  const addStrokeAssembly = (
-    parent: THREE.Group,
-    stroke: GlyphStroke,
-    coreRadius: number,
-    sheathRadius: number,
+  const frameCenterY = 0.22;
+
+  // Shared voxel cube geometries
+  const upperPitch = 0.29;
+  const upperCoreGeo = track(new THREE.BoxGeometry(0.22, 0.22, 0.22));
+  const upperShellGeo = track(new THREE.BoxGeometry(0.265, 0.265, 0.265));
+  const upperMountGeo = track(new THREE.BoxGeometry(0.24, 0.24, 0.16));
+
+  const lowerPitch = 0.175;
+  const lowerCoreGeo = track(new THREE.BoxGeometry(0.132, 0.132, 0.145));
+  const lowerShellGeo = track(new THREE.BoxGeometry(0.16, 0.16, 0.17));
+  const lowerMountGeo = track(new THREE.BoxGeometry(0.145, 0.145, 0.12));
+
+  const buildVoxelLetter = (
+    bitmap: string[],
+    pitch: number,
+    coreGeo: THREE.BoxGeometry,
+    shellGeo: THREE.BoxGeometry,
+    mountGeo: THREE.BoxGeometry,
     coreMat: THREE.MeshStandardMaterial,
-    sheathMat: THREE.MeshStandardMaterial,
-    isLarge: boolean,
-  ) => {
-    const coreGeo = track(
-      new THREE.TubeGeometry(stroke.curve, stroke.segments, coreRadius, 14, stroke.closed),
-    );
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    parent.add(coreMesh);
-    clickableMeshes.push(coreMesh);
-
-    const sheathGeo = track(
-      new THREE.TubeGeometry(stroke.curve, stroke.segments, sheathRadius, 14, stroke.closed),
-    );
-    const sheathMesh = new THREE.Mesh(sheathGeo, sheathMat);
-    parent.add(sheathMesh);
-
-    // Endpoint electrode boots & standoffs for physical 3D authenticity
-    if (!stroke.closed) {
-      const startPt = stroke.curve.getPointAt(0);
-      const startTan = stroke.curve.getTangentAt(0).normalize();
-      const endPt = stroke.curve.getPointAt(1);
-      const endTan = stroke.curve.getTangentAt(1).normalize();
-
-      const up = new THREE.Vector3(0, 1, 0);
-      const activeCapGeo = isLarge ? capGeo : smallCapGeo;
-      const activeTipGeo = isLarge ? tipSphereGeo : smallTipSphereGeo;
-
-      const capA = new THREE.Mesh(activeCapGeo, siliconeCapMat);
-      capA.position.copy(startPt);
-      capA.quaternion.setFromUnitVectors(up, startTan);
-      parent.add(capA);
-
-      const tipA = new THREE.Mesh(activeTipGeo, coreMat);
-      tipA.position.copy(startPt);
-      parent.add(tipA);
-
-      const capB = new THREE.Mesh(activeCapGeo, siliconeCapMat);
-      capB.position.copy(endPt);
-      capB.quaternion.setFromUnitVectors(up, endTan);
-      parent.add(capB);
-
-      const tipB = new THREE.Mesh(activeTipGeo, coreMat);
-      tipB.position.copy(endPt);
-      parent.add(tipB);
-    }
-
-    // Add 2 brushed titanium standoff pins anchoring stroke toward the rear chassis plane
-    const anchorPositions = [0.22, 0.78];
-    for (const t of anchorPositions) {
-      const pt = stroke.curve.getPointAt(t);
-      const pin = new THREE.Mesh(standoffGeo, titaniumMat);
-      pin.rotation.x = Math.PI / 2;
-      pin.position.set(pt.x, pt.y, -0.17);
-      parent.add(pin);
-    }
-  };
-
-  // --- Build Upper Row: "LSL" ---
-  const upperChars = ['L', 'S', 'L'];
-  const upperSpecs = upperChars.map((ch) => getUpperGlyphSpec(ch, 1.55, 2.05));
-  const upperGap = 0.48;
-  const totalUpperWidth =
-    upperSpecs.reduce((sum, spec) => sum + spec.width, 0) +
-    upperGap * (upperSpecs.length - 1);
-
-  let cursorX = -totalUpperWidth / 2;
-  const upperY = -0.04;
-  const frameCenterY = 0.24;
-
-  upperSpecs.forEach((spec, idx) => {
+    shellMat: THREE.MeshStandardMaterial,
+    posX: number,
+    posY: number,
+    posZ: number,
+    phase: number,
+    isPrimary: boolean,
+  ): number => {
+    const rows = bitmap.length;
+    const cols = bitmap[0]?.length ?? 0;
     const letterGroup = new THREE.Group();
-    letterGroup.position.set(cursorX, upperY, 0);
-    letterGroup.userData = { baseY: upperY, phase: idx * 0.85, tier: 'primary' };
-    spec.strokes.forEach((stroke) => {
-      addStrokeAssembly(
-        letterGroup,
-        stroke,
-        0.068,
-        0.105,
-        primaryCoreMat,
-        primaryTubeMat,
-        true,
-      );
-      const sampleCount = 72;
-      for (let i = 0; i < sampleCount; i++) {
-        const pt = stroke.curve.getPointAt(i / (sampleCount - 1));
-        dissolveSamples.push({
-          position: new THREE.Vector3(
-            cursorX + pt.x,
-            upperY - frameCenterY + pt.y,
-            pt.z,
-          ),
-          isPrimary: true,
-        });
+    letterGroup.position.set(posX, posY, posZ);
+    letterGroup.userData = { baseY: posY, phase, tier: isPrimary ? 'primary' : 'secondary' };
+
+    for (let r = 0; r < rows; r++) {
+      const rowStr = bitmap[r];
+      for (let c = 0; c < cols; c++) {
+        if (rowStr[c] !== '1') continue;
+        const vx = (c + 0.5) * pitch;
+        const vy = (rows - 1 - r + 0.5) * pitch;
+
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.set(vx, vy, 0.02);
+        letterGroup.add(core);
+        clickableMeshes.push(core);
+
+        const shell = new THREE.Mesh(shellGeo, shellMat);
+        shell.position.set(vx, vy, 0.02);
+        letterGroup.add(shell);
+
+        const mount = new THREE.Mesh(mountGeo, titaniumMat);
+        mount.position.set(vx, vy, -0.15);
+        letterGroup.add(mount);
+
+        // 2 voxel scatter samples per pixel block for dense 8-bit shatter burst
+        for (let k = 0; k < 2; k++) {
+          dissolveSamples.push({
+            position: new THREE.Vector3(
+              posX + vx + (k === 0 ? -0.04 : 0.04),
+              posY - frameCenterY + vy + (k === 0 ? 0.04 : -0.04),
+              posZ + 0.02,
+            ),
+            isPrimary,
+          });
+        }
       }
-    });
+    }
+
     signGroup.add(letterGroup);
     letterGroups.push(letterGroup);
-    cursorX += spec.width + upperGap;
+    return cols * pitch;
+  };
+
+  // --- Build Upper Row: "LSL" in glowing Cyan voxels ---
+  const upperChars = ['L', 'S', 'L'];
+  const upperGap = 0.54;
+  const upperWidths = upperChars.map((ch) => (UPPER_BITMAPS[ch][0].length) * upperPitch);
+  const totalUpperWidth =
+    upperWidths.reduce((a, b) => a + b, 0) + upperGap * (upperChars.length - 1);
+
+  let cursorX = -totalUpperWidth / 2;
+  const upperY = 0.02;
+
+  upperChars.forEach((ch, idx) => {
+    const w = buildVoxelLetter(
+      UPPER_BITMAPS[ch],
+      upperPitch,
+      upperCoreGeo,
+      upperShellGeo,
+      upperMountGeo,
+      primaryCoreMat,
+      primaryTubeMat,
+      cursorX,
+      upperY,
+      0.04,
+      idx * 0.85,
+      true,
+    );
+    cursorX += w + upperGap;
   });
 
-  // --- Build Lower Row: "School" ---
+  // --- Build Lower Row: "School" in glowing Magenta voxels ---
   const lowerChars = ['S', 'c', 'h', 'o', 'o', 'l'];
-  const lowerScale = 1.12;
-  const lowerSpecs = lowerChars.map((ch) => getLowerGlyphSpec(ch, lowerScale));
   const lowerGap = 0.22;
+  const lowerWidths = lowerChars.map((ch) => (LOWER_BITMAPS[ch][0].length) * lowerPitch);
   const totalLowerWidth =
-    lowerSpecs.reduce((sum, spec) => sum + spec.width, 0) +
-    lowerGap * (lowerSpecs.length - 1);
+    lowerWidths.reduce((a, b) => a + b, 0) + lowerGap * (lowerChars.length - 1);
 
   cursorX = -totalLowerWidth / 2;
   const lowerY = -1.52;
 
-  lowerSpecs.forEach((spec, idx) => {
-    const letterGroup = new THREE.Group();
-    letterGroup.position.set(cursorX, lowerY, 0.04);
-    letterGroup.userData = { baseY: lowerY, phase: 2.4 + idx * 0.55, tier: 'secondary' };
-    spec.strokes.forEach((stroke) => {
-      addStrokeAssembly(
-        letterGroup,
-        stroke,
-        0.045,
-        0.072,
-        secondaryCoreMat,
-        secondaryTubeMat,
-        false,
-      );
-      const sampleCount = 46;
-      for (let i = 0; i < sampleCount; i++) {
-        const pt = stroke.curve.getPointAt(i / (sampleCount - 1));
-        dissolveSamples.push({
-          position: new THREE.Vector3(
-            cursorX + pt.x,
-            lowerY - frameCenterY + pt.y,
-            0.04 + pt.z,
-          ),
-          isPrimary: false,
-        });
-      }
-    });
-    signGroup.add(letterGroup);
-    letterGroups.push(letterGroup);
-    cursorX += spec.width + lowerGap;
+  lowerChars.forEach((ch, idx) => {
+    const w = buildVoxelLetter(
+      LOWER_BITMAPS[ch],
+      lowerPitch,
+      lowerCoreGeo,
+      lowerShellGeo,
+      lowerMountGeo,
+      secondaryCoreMat,
+      secondaryTubeMat,
+      cursorX,
+      lowerY,
+      0.06,
+      2.2 + idx * 0.55,
+      false,
+    );
+    cursorX += w + lowerGap;
   });
 
-  // --- Sleek Floating Rear Chassis Rails & Capsule Neon Frame ---
-  const frameWidth = 7.8;
-  const frameHeight = 5.05;
-  const frameCurve = createCapsuleLoopCurve(frameWidth, frameHeight, 0.78, -0.34);
-  const frameTubeGeo = track(new THREE.TubeGeometry(frameCurve, 128, 0.038, 12, true));
-  const frameTubeMesh = new THREE.Mesh(frameTubeGeo, frameTubeMat);
-  frameTubeMesh.position.y = frameCenterY;
-  signGroup.add(frameTubeMesh);
+  // --- Stepped 8-Bit Voxel Marquee Frame ---
+  const frameStep = 0.22;
+  const frameCols = 38;
+  const frameRows = 24;
+  const frameVoxelGeo = track(new THREE.BoxGeometry(0.16, 0.16, 0.16));
+  const frameHalfW = ((frameCols - 1) * frameStep) / 2;
+  const frameHalfH = ((frameRows - 1) * frameStep) / 2;
 
-  for (let i = 0; i < 120; i++) {
-    const pt = frameCurve.getPointAt(i / 120);
-    dissolveSamples.push({
-      position: new THREE.Vector3(pt.x, pt.y, pt.z),
-      isPrimary: i % 2 === 0,
-    });
+  for (let r = 0; r < frameRows; r++) {
+    for (let c = 0; c < frameCols; c++) {
+      const isTop = r === 0;
+      const isBottom = r === frameRows - 1;
+      const isLeft = c === 0;
+      const isRight = c === frameCols - 1;
+
+      // Stepped pixel chamfered corners: skip the 2x2 outer corner cells and step inward
+      const inCornerCut =
+        (r <= 1 && c <= 1) ||
+        (r <= 1 && c >= frameCols - 2) ||
+        (r >= frameRows - 2 && c <= 1) ||
+        (r >= frameRows - 2 && c >= frameCols - 2);
+      const isCornerStep =
+        (r === 1 && (c === 1 || c === frameCols - 2)) ||
+        (r === frameRows - 2 && (c === 1 || c === frameCols - 2));
+
+      const isEdge =
+        (!inCornerCut && (isTop || isBottom || isLeft || isRight)) || isCornerStep;
+
+      if (!isEdge) continue;
+
+      const fx = c * frameStep - frameHalfW;
+      const fy = frameCenterY + (frameHalfH - r * frameStep);
+      const fz = -0.34;
+
+      const voxel = new THREE.Mesh(
+        frameVoxelGeo,
+        (r + c) % 4 === 0 ? titaniumMat : frameTubeMat,
+      );
+      voxel.position.set(fx, fy, fz);
+      signGroup.add(voxel);
+
+      if ((r + c) % 2 === 0) {
+        dissolveSamples.push({
+          position: new THREE.Vector3(fx, fy - frameCenterY, fz),
+          isPrimary: c % 2 === 0,
+        });
+      }
+    }
   }
 
-  // Dark anodized structural cross-bars behind letters for 3D depth
-  const railGeo = track(new THREE.BoxGeometry(6.4, 0.07, 0.07));
+  // Rear dark titanium pixel support beams
+  const railGeo = track(new THREE.BoxGeometry(6.8, 0.1, 0.1));
   const upperRail = new THREE.Mesh(railGeo, titaniumMat);
-  upperRail.position.set(0, 1.0, -0.34);
+  upperRail.position.set(0, 1.02, -0.34);
   signGroup.add(upperRail);
 
   const lowerRail = new THREE.Mesh(railGeo, titaniumMat);
-  lowerRail.position.set(0, -1.02, -0.34);
+  lowerRail.position.set(0, -0.96, -0.34);
   signGroup.add(lowerRail);
 
-  // Corner titanium clamp brackets on the outer neon capsule
-  const clampGeo = track(new THREE.BoxGeometry(0.18, 0.18, 0.14));
-  const clampCoords: Array<[number, number]> = [
-    [-3.88, frameCenterY + 1.65],
-    [3.88, frameCenterY + 1.65],
-    [-3.88, frameCenterY - 1.65],
-    [3.88, frameCenterY - 1.65],
-  ];
-  for (const [cx, cy] of clampCoords) {
-    const clamp = new THREE.Mesh(clampGeo, titaniumMat);
-    clamp.position.set(cx, cy, -0.34);
-    signGroup.add(clamp);
-  }
-
-  // --- Invisible Hit-Test Proxy Plane for effortless Click-to-Surge Raycasting ---
-  const hitProxyGeo = track(new THREE.PlaneGeometry(8.0, 5.2));
+  // --- Invisible Hit-Test Proxy Plane for Click-to-Surge ---
+  const hitProxyGeo = track(new THREE.PlaneGeometry(8.4, 5.4));
   const hitProxyMat = track(
     new THREE.MeshBasicMaterial({
       visible: false,
@@ -629,23 +434,37 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
     }),
   );
   const hitProxy = new THREE.Mesh(hitProxyGeo, hitProxyMat);
-  hitProxy.position.set(0, frameCenterY, 0.1);
+  hitProxy.position.set(0, frameCenterY, 0.12);
   signGroup.add(hitProxy);
   clickableMeshes.push(hitProxy);
 
-  // --- Two Orbiting 3D Neon Energy Rings ---
-  const outerRingGeo = track(new THREE.TorusGeometry(5.15, 0.022, 12, 128));
-  const outerRing = new THREE.Mesh(outerRingGeo, ringOuterMat);
+  // --- Two Orbiting 3D Voxel Rings (Pixel Satellites) ---
+  const outerRing = new THREE.Group();
   outerRing.rotation.set(Math.PI * 0.42, Math.PI * 0.12, 0);
+  const outerBlockGeo = track(new THREE.BoxGeometry(0.14, 0.14, 0.14));
+  const outerCount = 44;
+  for (let i = 0; i < outerCount; i++) {
+    const angle = (i / outerCount) * Math.PI * 2;
+    const cube = new THREE.Mesh(outerBlockGeo, ringOuterMat);
+    cube.position.set(Math.cos(angle) * 5.25, Math.sin(angle) * 5.25, 0);
+    outerRing.add(cube);
+  }
   root.add(outerRing);
 
-  const innerRingGeo = track(new THREE.TorusGeometry(4.62, 0.018, 12, 128));
-  const innerRing = new THREE.Mesh(innerRingGeo, ringInnerMat);
+  const innerRing = new THREE.Group();
   innerRing.rotation.set(-Math.PI * 0.38, -Math.PI * 0.16, 0);
+  const innerBlockGeo = track(new THREE.BoxGeometry(0.11, 0.11, 0.11));
+  const innerCount = 36;
+  for (let i = 0; i < innerCount; i++) {
+    const angle = (i / innerCount) * Math.PI * 2;
+    const cube = new THREE.Mesh(innerBlockGeo, ringInnerMat);
+    cube.position.set(Math.cos(angle) * 4.65, Math.sin(angle) * 4.65, 0);
+    innerRing.add(cube);
+  }
   root.add(innerRing);
 
-  // --- Soft Additive Atmospheric Glow Halos (ensures luminous neon aura on GPU & Software WebGL) ---
-  const haloTex = track(createSoftHaloTexture());
+  // --- Stepped Pixel Atmospheric Glow Halos ---
+  const haloTex = track(createPixelHaloTexture());
   haloTex.anisotropy = maxAnisotropy;
 
   const primaryHaloMat = track(
@@ -653,14 +472,14 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
       map: haloTex,
       color: new THREE.Color('#22D3EE'),
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.34,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }),
   );
   const primaryHalo = new THREE.Sprite(primaryHaloMat);
-  primaryHalo.position.set(0, 0.96, -0.52);
-  primaryHalo.scale.set(9.4, 4.2, 1);
+  primaryHalo.position.set(0, 1.0, -0.52);
+  primaryHalo.scale.set(9.2, 4.0, 1);
   signGroup.add(primaryHalo);
 
   const secondaryHaloMat = track(
@@ -668,30 +487,28 @@ export function buildNeonSculpture(maxAnisotropy = 4): NeonSculptureRig {
       map: haloTex,
       color: new THREE.Color('#EC4899'),
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.3,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }),
   );
   const secondaryHalo = new THREE.Sprite(secondaryHaloMat);
-  secondaryHalo.position.set(0, -1.04, -0.48);
-  secondaryHalo.scale.set(7.8, 2.8, 1);
+  secondaryHalo.position.set(0, -1.0, -0.48);
+  secondaryHalo.scale.set(7.6, 2.8, 1);
   signGroup.add(secondaryHalo);
 
-  // Center the vertical composition gracefully around world origin
   signGroup.position.y = -frameCenterY;
 
   const setVisibilityFade = (fade: number) => {
     const clamped = THREE.MathUtils.clamp(fade, 0, 1);
     primaryCoreMat.opacity = clamped;
-    primaryTubeMat.opacity = 0.42 * clamped;
+    primaryTubeMat.opacity = 0.48 * clamped;
     secondaryCoreMat.opacity = clamped;
-    secondaryTubeMat.opacity = 0.42 * clamped;
+    secondaryTubeMat.opacity = 0.48 * clamped;
     frameTubeMat.opacity = clamped;
     ringOuterMat.opacity = clamped;
     ringInnerMat.opacity = clamped;
     titaniumMat.opacity = clamped;
-    siliconeCapMat.opacity = clamped;
     root.visible = clamped > 0.01;
   };
 

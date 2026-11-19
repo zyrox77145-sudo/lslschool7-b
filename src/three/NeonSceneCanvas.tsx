@@ -41,35 +41,28 @@ function detectSoftwareWebGL(): boolean {
 }
 
 function createParticleTexture(): THREE.CanvasTexture {
-  const size = 64;
+  const size = 16;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const g = ctx.createRadialGradient(
-      size / 2,
-      size / 2,
-      0,
-      size / 2,
-      size / 2,
-      size / 2,
-    );
-    g.addColorStop(0.0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.3, 'rgba(255,255,255,0.65)');
-    g.addColorStop(0.7, 'rgba(255,255,255,0.14)');
-    g.addColorStop(1.0, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, size, size);
+    // Crisp square pixel particle with bright core and 2px stepped border
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillRect(2, 2, 12, 12);
+    ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+    ctx.fillRect(4, 4, 8, 8);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
   return tex;
 }
 
 function createHorizonGridTexture(maxAnisotropy: number): THREE.CanvasTexture {
-  const size = 512;
+  const size = 256;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -78,28 +71,26 @@ function createHorizonGridTexture(maxAnisotropy: number): THREE.CanvasTexture {
     ctx.fillStyle = '#05070e';
     ctx.fillRect(0, 0, size, size);
 
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
-    ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.16)';
     const step = size / 8;
-    for (let i = 0; i <= 8; i++) {
+    for (let i = 0; i < 8; i++) {
       const p = i * step;
-      ctx.beginPath();
-      ctx.moveTo(p, 0);
-      ctx.lineTo(p, size);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(0, p);
-      ctx.lineTo(size, p);
-      ctx.stroke();
+      ctx.fillRect(p, 0, 2, size);
+      ctx.fillRect(0, p, size, 2);
+      // Pixel intersection dot
+      ctx.fillStyle = 'rgba(34, 211, 238, 0.45)';
+      ctx.fillRect(p - 1, p - 1, 4, 4);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.16)';
     }
 
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.34)';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.4)';
+    ctx.lineWidth = 4;
     ctx.strokeRect(0, 0, size, size);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(18, 18);
@@ -247,7 +238,7 @@ export const NeonSceneCanvas: React.FC<NeonSceneCanvasProps> = ({
     dissolveGeo.setAttribute('color', new THREE.BufferAttribute(dissolveColors, 3));
 
     const dissolveMat = new THREE.PointsMaterial({
-      size: 0.24,
+      size: 0.28,
       map: particleTex,
       vertexColors: true,
       transparent: true,
@@ -307,11 +298,11 @@ export const NeonSceneCanvas: React.FC<NeonSceneCanvasProps> = ({
     particleGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const particleMat = new THREE.PointsMaterial({
-      size: 0.18,
+      size: 0.2,
       map: particleTex,
       vertexColors: true,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.82,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -685,21 +676,21 @@ export const NeonSceneCanvas: React.FC<NeonSceneCanvasProps> = ({
 
   if (webglError || contextLost) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-[#05070d] px-6">
-        <div className="max-w-md rounded-2xl border border-white/10 bg-[#0b0f1a] p-8 text-center">
+      <div className="pixel-grid-bg absolute inset-0 flex items-center justify-center bg-[#05070d] px-6">
+        <div className="pixel-panel max-w-md p-8 text-center">
           <div
             className="font-display text-5xl font-bold tracking-tight text-cyan-400"
-            style={{ textShadow: '0 0 24px #22D3EE' }}
+            style={{ textShadow: '4px 4px 0 #083344' }}
           >
             LSL
           </div>
           <div
-            className="font-display mt-1 text-2xl font-semibold text-pink-500"
-            style={{ textShadow: '0 0 18px #EC4899' }}
+            className="font-display mt-1 text-2xl font-bold text-pink-500"
+            style={{ textShadow: '3px 3px 0 #500724' }}
           >
             School
           </div>
-          <h2 className="mt-5 text-base font-medium text-slate-100">
+          <h2 className="font-display mt-5 text-sm font-bold text-slate-100">
             LSL School — 3D Scene Paused
           </h2>
           <p className="mt-2 text-sm text-slate-400">
@@ -712,7 +703,7 @@ export const NeonSceneCanvas: React.FC<NeonSceneCanvasProps> = ({
               setContextLost(false);
               setRemountKey((k) => k + 1);
             }}
-            className="mt-6 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400"
+            className="pixel-btn mt-6 border-2 border-cyan-300 bg-cyan-500 px-5 py-2.5 font-display text-xs font-bold text-slate-950 hover:bg-cyan-400"
           >
             Restore 3D Scene
           </button>

@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "ClassSchedule": {
+      "title": "ClassSchedule",
+      "description": "Weekly 8-period school schedule (Monday through Sunday) for Class 7-B at LSL School.",
+      "type": "object",
+      "properties": {
+        "Monday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Monday."
+        },
+        "Tuesday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Tuesday."
+        },
+        "Wednesday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Wednesday."
+        },
+        "Thursday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Thursday."
+        },
+        "Friday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Friday."
+        },
+        "Saturday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Saturday."
+        },
+        "Sunday": {
+          "type": "array",
+          "description": "Ordered 8-period schedule entries for Sunday."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the schedule document was initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the latest schedule update."
+        }
+      },
+      "required": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/classSchedules/{scheduleId}": {
+      "schema": {
+        "$ref": "#/entities/ClassSchedule"
+      },
+      "description": "Shared Class 7-B weekly schedule document (`class-7b`) synced across all students and devices."
+    }
+  }
+}

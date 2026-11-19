@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Bookmark, Check, LogOut } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { FloatingScheduleTrigger } from './components/FloatingScheduleTrigger';
+import {
+  PixelBookmarkIcon,
+  PixelCheckIcon,
+  PixelLogOutIcon,
+} from './components/PixelIcons';
 import { ScheduleStage } from './components/ScheduleStage';
 import { StudentLoginGate } from './components/StudentLoginGate';
 import {
@@ -14,8 +18,14 @@ import {
   createMondayDefaultSchedule,
   DAYS_OF_WEEK,
   loadSavedSchedule,
+  sanitizeScheduleForFirestore,
   SCHEDULE_STORAGE_KEY,
 } from './constants/schedule';
+import {
+  saveClassScheduleToCloud,
+  seedClassScheduleIfMissing,
+  subscribeToClassSchedule,
+} from './services/scheduleSync';
 import { NeonSceneCanvas } from './three/NeonSceneCanvas';
 import { DayOfWeek, WeeklySchedule } from './types/neon';
 
@@ -27,8 +37,24 @@ export default function App() {
     () => loadSavedStudent(),
   );
   const [schedule, setSchedule] = useState<WeeklySchedule>(() => loadSavedSchedule());
+  const scheduleRef = useRef<WeeklySchedule>(schedule);
+  const hasSeededCloudRef = useRef(false);
+  const [cloudError, setCloudError] = useState<unknown>(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
+
+  if (cloudError) {
+    throw cloudError;
+  }
+
+  useEffect(() => {
+    scheduleRef.current = schedule;
+    try {
+      localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
+    } catch {
+      // Ignore storage quota errors gracefully
+    }
+  }, [schedule]);
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -39,12 +65,36 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
-    } catch {
-      // Ignore storage quota errors gracefully
-    }
-  }, [schedule]);
+    const unsubscribe = subscribeToClassSchedule(
+      (remoteSchedule) => {
+        hasSeededCloudRef.current = true;
+        scheduleRef.current = remoteSchedule;
+        setSchedule(remoteSchedule);
+      },
+      () => {
+        if (!hasSeededCloudRef.current) {
+          hasSeededCloudRef.current = true;
+          void seedClassScheduleIfMissing(scheduleRef.current).catch((err) => {
+            setCloudError(err);
+          });
+        }
+      },
+      (err) => {
+        setCloudError(err);
+      },
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const commitCloudSchedule = useCallback((nextSchedule: WeeklySchedule) => {
+    const sanitized = sanitizeScheduleForFirestore(nextSchedule);
+    scheduleRef.current = sanitized;
+    setSchedule(sanitized);
+    void saveClassScheduleToCloud(sanitized).catch((err) => {
+      setCloudError(err);
+    });
+  }, []);
 
   const handleLogin = useCallback(
     (student: AuthenticatedStudent, saveForFuture: boolean) => {
@@ -76,58 +126,61 @@ export default function App() {
   const handleUpdatePeriod = useCallback(
     (day: DayOfWeek, period: number, time: string, subject: string) => {
       if (!currentStudent?.isCreator) return;
-      setSchedule((prev) => ({
+      const prev = scheduleRef.current;
+      const next: WeeklySchedule = {
         ...prev,
         [day]: prev[day].map((entry) =>
           entry.period === period ? { ...entry, time, subject } : entry,
         ),
-      }));
+      };
+      commitCloudSchedule(next);
     },
-    [currentStudent],
+    [commitCloudSchedule, currentStudent],
   );
 
   const handleSyncTimesToAllDays = useCallback(
     (sourceDay: DayOfWeek) => {
       if (!currentStudent?.isCreator) return;
-      setSchedule((prev) => {
-        const sourceTimes = prev[sourceDay].map((entry) => entry.time);
-        const next = { ...prev };
-        for (const day of DAYS_OF_WEEK) {
-          next[day] = prev[day].map((entry, idx) => ({
-            ...entry,
-            time: sourceTimes[idx] ?? entry.time,
-          }));
-        }
-        return next;
-      });
+      const prev = scheduleRef.current;
+      const sourceTimes = prev[sourceDay].map((entry) => entry.time);
+      const next: WeeklySchedule = { ...prev };
+      for (const day of DAYS_OF_WEEK) {
+        next[day] = prev[day].map((entry, idx) => ({
+          ...entry,
+          time: sourceTimes[idx] ?? entry.time,
+        }));
+      }
+      commitCloudSchedule(next);
     },
-    [currentStudent],
+    [commitCloudSchedule, currentStudent],
   );
 
   const handleClearDay = useCallback(
     (day: DayOfWeek) => {
       if (!currentStudent?.isCreator) return;
-      setSchedule((prev) => ({
+      const prev = scheduleRef.current;
+      const next: WeeklySchedule = {
         ...prev,
         [day]: prev[day].map((entry) => ({ ...entry, subject: '' })),
-      }));
+      };
+      commitCloudSchedule(next);
     },
-    [currentStudent],
+    [commitCloudSchedule, currentStudent],
   );
 
   const handleRestoreMonday = useCallback(() => {
     if (!currentStudent?.isCreator) return;
-    setSchedule((prev) => {
-      const defaultMonday = createMondayDefaultSchedule();
-      return {
-        ...prev,
-        Monday: prev.Monday.map((entry, idx) => ({
-          ...entry,
-          subject: defaultMonday[idx].subject,
-        })),
-      };
-    });
-  }, [currentStudent]);
+    const prev = scheduleRef.current;
+    const defaultMonday = createMondayDefaultSchedule();
+    const next: WeeklySchedule = {
+      ...prev,
+      Monday: prev.Monday.map((entry, idx) => ({
+        ...entry,
+        subject: defaultMonday[idx].subject,
+      })),
+    };
+    commitCloudSchedule(next);
+  }, [commitCloudSchedule, currentStudent]);
 
   const isSaved =
     savedStudent !== null &&
@@ -143,6 +196,12 @@ export default function App() {
         isScheduleOpen={isScheduleOpen}
       />
 
+      {/* Subtle crisp CRT pixel scanline texture */}
+      <div
+        className="pixel-scanlines pointer-events-none fixed inset-0 z-10 opacity-45"
+        aria-hidden="true"
+      />
+
       {!currentStudent ? (
         <StudentLoginGate
           reducedMotion={reducedMotion}
@@ -150,17 +209,17 @@ export default function App() {
         />
       ) : (
         <>
-          {/* Discreet bottom-right student session & Save / Sign-out controls */}
+          {/* Discreet bottom-right pixel student session & Save / Sign-out controls */}
           {!isScheduleOpen && (
             <div className="pointer-events-none fixed bottom-5 right-5 z-20 flex items-center gap-2">
-              <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-white/10 bg-[#0b0f1a]/90 px-3 py-1.5 text-xs text-slate-300">
-                <span className="font-medium text-slate-100">
+              <div className="pixel-panel-neutral pointer-events-auto flex items-center gap-2.5 px-3 py-1.5 text-xs text-slate-200">
+                <span className="font-semibold text-slate-100">
                   {currentStudent.firstName}
                   {currentStudent.lastName ? ` ${currentStudent.lastName}` : ''}
                 </span>
 
                 {currentStudent.isCreator && (
-                  <span className="text-[11px] font-medium text-cyan-400">
+                  <span className="font-display text-[10px] font-bold text-cyan-400">
                     · Editor
                   </span>
                 )}
@@ -169,14 +228,14 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleSaveCurrentStudent}
-                    className="flex items-center gap-1 rounded-lg bg-cyan-500 px-2.5 py-1 text-[11px] font-semibold text-slate-950 transition-colors hover:bg-cyan-400 whitespace-nowrap"
+                    className="pixel-btn-sm flex items-center gap-1 border border-cyan-300 bg-cyan-500 px-2.5 py-1 font-display text-[10px] font-bold text-slate-950 hover:bg-cyan-400 whitespace-nowrap"
                   >
-                    <Bookmark className="h-3 w-3" aria-hidden="true" />
+                    <PixelBookmarkIcon className="h-3 w-3" />
                     <span>Save</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-cyan-400 whitespace-nowrap">
-                    <Check className="h-3 w-3" aria-hidden="true" />
+                  <span className="flex items-center gap-1 font-display text-[10px] font-bold text-cyan-400 whitespace-nowrap">
+                    <PixelCheckIcon className="h-3 w-3" />
                     <span>Saved</span>
                   </span>
                 )}
@@ -186,9 +245,9 @@ export default function App() {
                   onClick={handleSignOut}
                   title="Sign out"
                   aria-label="Sign out"
-                  className="flex items-center justify-center rounded-lg p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                  className="flex items-center justify-center p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
                 >
-                  <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                  <PixelLogOutIcon className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -218,7 +277,7 @@ export default function App() {
         </>
       )}
 
-      <div className="pointer-events-none fixed bottom-5 left-5 z-40 text-xs font-medium text-slate-400/55">
+      <div className="pointer-events-none fixed bottom-5 left-5 z-40 font-display text-[11px] font-bold text-slate-400/60">
         Created by Asrorbek 7 - B LSL Student
       </div>
     </main>

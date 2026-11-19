@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
-import {
-  AlertCircle,
-  ArrowLeft,
-  BookmarkCheck,
-  Eye,
-  EyeOff,
-  KeyRound,
-  LogIn,
-  ShieldCheck,
-} from 'lucide-react';
 import { motion } from 'motion/react';
 import {
   AuthenticatedStudent,
   matchClassStudent,
   verifyCreatorKey,
 } from '../constants/roster';
+import {
+  PixelAlertIcon,
+  PixelArrowLeftIcon,
+  PixelBookmarkIcon,
+  PixelEyeIcon,
+  PixelEyeOffIcon,
+  PixelKeyIcon,
+  PixelLogInIcon,
+  PixelShieldCheckIcon,
+} from './PixelIcons';
 
 interface StudentLoginGateProps {
   reducedMotion: boolean;
@@ -69,31 +69,34 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-30 flex min-h-screen w-screen items-center justify-center bg-[#05070d]/92 px-4 py-8">
+    <div className="pixel-grid-bg fixed inset-0 z-30 flex min-h-screen w-screen items-center justify-center bg-[#05070d]/94 px-4 py-8">
       <motion.div
         key={step}
-        initial={reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
+        initial={reducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
-          duration: reducedMotion ? 0 : 0.3,
+          duration: reducedMotion ? 0 : 0.24,
           ease: [0.16, 1, 0.3, 1],
         }}
-        className="w-full max-w-md rounded-2xl border border-white/12 bg-[#0b0f1a] p-6 sm:p-8 shadow-[0_0_60px_rgba(34,211,238,0.14)]"
+        className="pixel-panel relative w-full max-w-md p-6 sm:p-8"
       >
+        {/* Crisp 8-bit corner pixel rivets */}
+        <span className="pointer-events-none absolute top-1.5 left-1.5 h-1.5 w-1.5 bg-cyan-400" aria-hidden="true" />
+        <span className="pointer-events-none absolute top-1.5 right-1.5 h-1.5 w-1.5 bg-cyan-400" aria-hidden="true" />
+        <span className="pointer-events-none absolute bottom-1.5 left-1.5 h-1.5 w-1.5 bg-pink-400" aria-hidden="true" />
+        <span className="pointer-events-none absolute right-1.5 bottom-1.5 h-1.5 w-1.5 bg-pink-400" aria-hidden="true" />
+
         {step === 'name' ? (
           <>
             {/* Top Error Alert (shown on unrecognized student) */}
             {nameError && (
               <div
                 role="alert"
-                className="mb-6 flex items-start gap-3 rounded-xl border border-rose-500/50 bg-rose-950/70 px-4 py-3.5 text-rose-100"
+                className="pixel-panel-error mb-6 flex items-start gap-3 px-4 py-3 text-rose-100"
               >
-                <AlertCircle
-                  className="mt-0.5 h-5 w-5 shrink-0 text-rose-400"
-                  aria-hidden="true"
-                />
+                <PixelAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
                 <div>
-                  <div className="font-display text-xs font-bold tracking-wider uppercase text-rose-300">
+                  <div className="font-display text-xs font-bold tracking-wider text-rose-300">
                     ERROR
                   </div>
                   <p className="mt-0.5 text-sm font-medium text-white">
@@ -105,10 +108,19 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
 
             {/* Brand Header */}
             <div className="text-center">
-              <div className="font-display text-3xl font-bold tracking-tight text-cyan-400">
-                LSL <span className="text-pink-400">School</span>
+              <div
+                className="font-display text-3xl font-bold tracking-tight text-cyan-400"
+                style={{ textShadow: '3px 3px 0 #083344' }}
+              >
+                LSL{' '}
+                <span
+                  className="text-pink-400"
+                  style={{ textShadow: '3px 3px 0 #500724' }}
+                >
+                  School
+                </span>
               </div>
-              <p className="mt-1.5 text-sm font-medium text-slate-200">
+              <p className="mt-2.5 text-sm font-medium text-slate-100">
                 Ism va Familiyangizni boshini bosh harf bilan to&apos;liq yozing
               </p>
               <p className="mt-1 text-xs text-slate-400">
@@ -122,12 +134,12 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
                 e.preventDefault();
                 attemptNameStep(false);
               }}
-              className="mt-7 space-y-4"
+              className="mt-6 space-y-4"
             >
               <div>
                 <label
                   htmlFor="student-first-name"
-                  className="block text-xs font-medium text-slate-300"
+                  className="block font-display text-[11px] font-bold text-slate-300"
                 >
                   First Name (Ism)
                 </label>
@@ -141,14 +153,14 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
                     if (nameError) setNameError(false);
                   }}
                   placeholder="Enter a Name"
-                  className="mt-1.5 w-full min-h-11 rounded-xl border border-white/14 bg-[#070a12] px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
+                  className="pixel-input mt-1.5 min-h-11 w-full px-3.5 py-2.5 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="student-last-name"
-                  className="block text-xs font-medium text-slate-300"
+                  className="block font-display text-[11px] font-bold text-slate-300"
                 >
                   Last Name (Familiya)
                 </label>
@@ -162,25 +174,25 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
                     if (nameError) setNameError(false);
                   }}
                   placeholder="Username"
-                  className="mt-1.5 w-full min-h-11 rounded-xl border border-white/14 bg-[#070a12] px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
+                  className="pixel-input mt-1.5 min-h-11 w-full px-3.5 py-2.5 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none"
                 />
               </div>
 
-              <div className="flex flex-col gap-2.5 pt-2 sm:flex-row">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 <button
                   type="submit"
-                  className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/6 px-4 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:border-white/30 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap"
+                  className="pixel-btn flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-slate-400/50 bg-[#12192d] px-4 py-2.5 font-display text-xs font-bold text-slate-100 hover:border-slate-300 hover:bg-[#192340] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap"
                 >
-                  <LogIn className="h-4 w-4 text-slate-300" aria-hidden="true" />
+                  <PixelLogInIcon className="h-4 w-4 text-slate-300" />
                   <span>Enter</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => attemptNameStep(true)}
-                  className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 whitespace-nowrap"
+                  className="pixel-btn flex min-h-11 flex-1 items-center justify-center gap-2 border-2 border-cyan-300 bg-cyan-500 px-4 py-2.5 font-display text-xs font-bold text-slate-950 hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 whitespace-nowrap"
                 >
-                  <BookmarkCheck className="h-4 w-4" aria-hidden="true" />
+                  <PixelBookmarkIcon className="h-4 w-4" />
                   <span>Save &amp; Enter</span>
                 </button>
               </div>
@@ -192,14 +204,11 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
             {keyError && (
               <div
                 role="alert"
-                className="mb-6 flex items-start gap-3 rounded-xl border border-rose-500/50 bg-rose-950/70 px-4 py-3.5 text-rose-100"
+                className="pixel-panel-error mb-6 flex items-start gap-3 px-4 py-3 text-rose-100"
               >
-                <AlertCircle
-                  className="mt-0.5 h-5 w-5 shrink-0 text-rose-400"
-                  aria-hidden="true"
-                />
+                <PixelAlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
                 <div>
-                  <div className="font-display text-xs font-bold tracking-wider uppercase text-rose-300">
+                  <div className="font-display text-xs font-bold tracking-wider text-rose-300">
                     ERROR
                   </div>
                   <p className="mt-0.5 text-sm font-medium text-white">
@@ -217,26 +226,26 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
                   setKeyError(false);
                   setCreatorKeyInput('');
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:text-white"
+                className="pixel-btn-sm flex items-center gap-1.5 border-2 border-slate-500/50 bg-[#12192d] px-2.5 py-1.5 font-display text-[11px] font-bold text-slate-200 hover:border-cyan-400/70 hover:text-white"
               >
-                <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                <PixelArrowLeftIcon className="h-3.5 w-3.5" />
                 <span>Back</span>
               </button>
 
-              <span className="text-xs text-slate-400">
+              <span className="text-sm font-medium text-slate-300">
                 {pendingStudent?.firstName}
                 {pendingStudent?.lastName ? ` ${pendingStudent.lastName}` : ''}
               </span>
             </div>
 
             <div className="mt-5 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-400">
-                <KeyRound className="h-5 w-5" aria-hidden="true" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center border-2 border-cyan-400 bg-cyan-500/15 text-cyan-300 shadow-[3px_3px_0_0_#020308]">
+                <PixelKeyIcon className="h-6 w-6" />
               </div>
-              <h2 className="font-display mt-3 text-xl font-semibold text-slate-100">
+              <h2 className="font-display mt-3.5 text-lg font-bold text-slate-100">
                 Enter a Creator Key
               </h2>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-sm text-slate-400">
                 Creator Key unlocks schedule and time editing.
               </p>
             </div>
@@ -245,7 +254,7 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
               <div>
                 <label
                   htmlFor="creator-key-input"
-                  className="block text-xs font-medium text-slate-300"
+                  className="block font-display text-[11px] font-bold text-slate-300"
                 >
                   Creator Key
                 </label>
@@ -260,18 +269,18 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
                     }}
                     placeholder="Enter a Creator Key"
                     autoFocus
-                    className="w-full min-h-11 rounded-xl border border-white/14 bg-[#070a12] py-2.5 pl-4 pr-11 text-sm text-slate-100 placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
+                    className="pixel-input min-h-11 w-full py-2.5 pl-3.5 pr-11 text-base text-slate-100 placeholder:text-slate-500 focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowKey((prev) => !prev)}
                     aria-label={showKey ? 'Hide key' : 'Show key'}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition-colors hover:text-slate-200"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 transition-colors hover:text-cyan-300"
                   >
                     {showKey ? (
-                      <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      <PixelEyeOffIcon className="h-4 w-4" />
                     ) : (
-                      <Eye className="h-4 w-4" aria-hidden="true" />
+                      <PixelEyeIcon className="h-4 w-4" />
                     )}
                   </button>
                 </div>
@@ -279,16 +288,16 @@ export const StudentLoginGate: React.FC<StudentLoginGateProps> = ({
 
               <button
                 type="submit"
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                className="pixel-btn flex min-h-11 w-full items-center justify-center gap-2 border-2 border-cyan-300 bg-cyan-500 px-4 py-2.5 font-display text-xs font-bold text-slate-950 hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
               >
-                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                <PixelShieldCheckIcon className="h-4 w-4" />
                 <span>Unlock Editor Mode</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleNoCreatorKey}
-                className="flex min-h-11 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition-colors hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="pixel-btn flex min-h-11 w-full items-center justify-center border-2 border-emerald-300 bg-emerald-500 px-4 py-2.5 font-display text-xs font-bold text-slate-950 hover:bg-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
               >
                 I Have Not Creator Key
               </button>

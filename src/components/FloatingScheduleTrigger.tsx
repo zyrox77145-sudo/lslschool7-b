@@ -1,6 +1,6 @@
 import React from 'react';
-import { CalendarDays, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { PixelArrowRightIcon, PixelCalendarIcon } from './PixelIcons';
 
 interface FloatingScheduleTriggerProps {
   onOpenSchedule: () => void;
@@ -42,17 +42,14 @@ export const FloatingScheduleTrigger: React.FC<FloatingScheduleTriggerProps> = (
                 delay: 0.45,
               }
         }
-        className="pointer-events-auto group flex min-h-11 items-center gap-3 rounded-xl border border-cyan-400/45 bg-[#0b0f1a]/92 px-5 py-2.5 text-sm font-semibold text-slate-100 shadow-[0_0_24px_rgba(34,211,238,0.22)] transition-colors duration-150 hover:border-cyan-300 hover:bg-[#101729] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap shrink-0"
+        className="pixel-btn pointer-events-auto group relative flex min-h-11 items-center gap-3 border-2 border-cyan-400 bg-[#090d18]/95 px-5 py-2.5 text-sm font-bold text-slate-100 hover:border-cyan-300 hover:bg-[#10182d] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 whitespace-nowrap shrink-0"
       >
-        <CalendarDays
-          className="h-4 w-4 text-cyan-400 transition-colors group-hover:text-cyan-300"
-          aria-hidden="true"
-        />
-        <span className="font-display tracking-wide">7 - B Class Schedule</span>
-        <ChevronRight
-          className="h-4 w-4 text-pink-400 transition-transform duration-150 group-hover:translate-x-0.5"
-          aria-hidden="true"
-        />
+        <span className="h-1.5 w-1.5 bg-cyan-400" aria-hidden="true" />
+        <PixelCalendarIcon className="h-4 w-4 text-cyan-400 transition-colors group-hover:text-cyan-300" />
+        <span className="font-display text-xs tracking-wide sm:text-sm">
+          7 - B Class Schedule
+        </span>
+        <PixelArrowRightIcon className="h-4 w-4 text-pink-400 transition-transform duration-150 group-hover:translate-x-0.5" />
       </motion.button>
     </motion.div>
   );
