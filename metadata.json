@@ -1,0 +1,6 @@
+{
+  "name": "LSL School Neon",
+  "description": "Interactive 3D floating neon LSL School showcase with cyan and magenta bloom lighting, ambient particles, and bilingual controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
